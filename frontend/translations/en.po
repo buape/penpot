@@ -441,6 +441,12 @@ msgstr "Duplicate"
 msgid "dashboard.duplicate-multi"
 msgstr "Duplicate %s files"
 
+#: src/app/main/data/dashboard.cljs
+msgid "dashboard.duplicate-unsaved-changes"
+msgid_plural "dashboard.duplicate-unsaved-changes"
+msgstr[0] "Your file has been duplicated, but the copy doesn't include your latest changes because they aren't saved yet."
+msgstr[1] "Your files have been duplicated, but the copies don't include your latest changes because they aren't saved yet."
+
 #: src/app/main/ui/dashboard/files.cljs:233, src/app/main/ui/dashboard/projects.cljs:309
 msgid "dashboard.empty-placeholder-drafts-subtitle"
 msgstr "Once a project member creates a draft, it will be displayed here."
@@ -6631,6 +6637,46 @@ msgstr "Debugging tools"
 msgid "workspace.export.unsaved-changes"
 msgstr "Some of your latest changes are not saved yet, so this export may not include them."
 
+#: src/app/main/data/exports/assets.cljs
+msgid "workspace.export.unsaved-changes-included"
+msgstr "Some of your latest changes are not saved yet. This export includes them."
+
+#: src/app/main/ui/workspace/file_restored_modal.cljs
+msgid "workspace.file-restored.accept"
+msgstr "Got it"
+
+#: src/app/main/ui/workspace/file_restored_modal.cljs
+msgid "workspace.file-restored.message"
+msgstr "%s restored an earlier version of this file. Changes made after it are no longer in the file."
+
+#: src/app/main/ui/workspace/file_restored_modal.cljs
+msgid "workspace.file-restored.message-anonymous"
+msgstr "A teammate restored an earlier version of this file. Changes made after it are no longer in the file."
+
+#: src/app/main/ui/workspace/file_restored_modal.cljs
+msgid "workspace.file-restored.message-date"
+msgstr "%s restored the version from %s. Changes made after it are no longer in the file."
+
+#: src/app/main/ui/workspace/file_restored_modal.cljs
+msgid "workspace.file-restored.message-date-anonymous"
+msgstr "A teammate restored the version from %s. Changes made after it are no longer in the file."
+
+#: src/app/main/ui/workspace/file_restored_modal.cljs
+msgid "workspace.file-restored.message-label"
+msgstr "%s restored the version “%s”. Changes made after it are no longer in the file."
+
+#: src/app/main/ui/workspace/file_restored_modal.cljs
+msgid "workspace.file-restored.message-label-anonymous"
+msgstr "A teammate restored the version “%s”. Changes made after it are no longer in the file."
+
+#: src/app/main/ui/workspace/file_restored_modal.cljs
+msgid "workspace.file-restored.title"
+msgstr "This file was restored"
+
+#: src/app/main/ui/workspace/file_restored_modal.cljs
+msgid "workspace.file-restored.unsaved-changes"
+msgstr "Your latest changes couldn't be saved because a version of the file was restored."
+
 #: src/app/main/ui/workspace/sidebar/layers.cljs:907
 msgid "workspace.focus.focus-mode"
 msgstr "Focus mode"
@@ -9786,6 +9832,10 @@ msgstr "Restore version"
 #: src/app/main/ui/workspace/sidebar/versions.cljs:425, src/app/main/ui/workspace/sidebar/versions.cljs:427
 msgid "workspace.versions.button.save"
 msgstr "Save version"
+
+#: src/app/main/data/workspace/versions.cljs
+msgid "workspace.versions.create-failed-unsaved"
+msgstr "The version was not created because your changes could not be saved."
 
 #: src/app/main/ui/workspace/sidebar/versions.cljs:434
 msgid "workspace.versions.empty"
