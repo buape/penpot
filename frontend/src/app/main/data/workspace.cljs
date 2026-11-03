@@ -21,6 +21,7 @@
    [app.common.math :as mth]
    [app.common.path-names :as cpn]
    [app.common.render-wasm.wasm :as wasm-state]
+   [app.common.transit :as t]
    [app.common.types.component :as ctc]
    [app.common.types.components-list :as ctkl]
    [app.common.types.shape :as cts]
@@ -90,6 +91,8 @@
    [potok.v2.core :as ptk]))
 
 (log/set-level! :info)
+
+(t/add-handlers! {:id "u" :rfn t/read-uuid})
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Workspace Initialization
@@ -622,6 +625,7 @@
 
     ptk/WatchEvent
     (watch [_ state _]
+      (t/clear-uuid-cache!)
       (let [project-id (:current-project-id state)]
         (rx/of (dwn/finalize file-id)
                (dpj/finalize-project project-id)

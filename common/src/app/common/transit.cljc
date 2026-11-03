@@ -110,6 +110,38 @@
                (.set cache value kw)
                kw))))))
 
+#?(:cljs
+   (def ^:private uuid-cache-size
+     "Twice the ids of a very large page (~60k shapes), so decoding one
+     page does not rotate the cache."
+     131072))
+
+#?(:cljs (def ^:private recent-uuids (volatile! (js/Map.))))
+#?(:cljs (def ^:private previous-uuids (volatile! (js/Map.))))
+
+#?(:cljs
+   (defn clear-uuid-cache!
+     "Forget the cached uuids, so the ids of a closed file can be freed."
+     []
+     (vreset! recent-uuids (js/Map.))
+     (vreset! previous-uuids (js/Map.))))
+
+#?(:cljs
+   (defn read-uuid
+     "Give the same uuid instance for each value. Entries live in two
+     generations: when the recent one is full it becomes the previous one
+     and the older one is dropped, so the cache stays bounded. Opt-in: the
+     caller installs it as the \"u\" read handler and clears the cache."
+     [value]
+     (or (.get @recent-uuids value)
+         (let [id (or (.get @previous-uuids value)
+                      (parse-uuid value))]
+           (when (>= (.-size @recent-uuids) uuid-cache-size)
+             (vreset! previous-uuids @recent-uuids)
+             (vreset! recent-uuids (js/Map.)))
+           (.set @recent-uuids value id)
+           id))))
+
 (add-handlers!
  #?@(:clj
      [{:id "file"

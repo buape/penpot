@@ -13,12 +13,15 @@
    [app.common.geom.rect :as grc]
    [app.common.logging :as log]
    [app.common.time :as ct]
+   [app.common.transit :as t]
    [app.worker.impl :as impl]
    [app.worker.selection :as selection]
    [app.worker.snap :as snap]
    [okulary.core :as l]))
 
 (log/set-level! :info)
+
+(t/add-handlers! {:id "u" :rfn t/read-uuid})
 
 (defonce state (l/atom {:pages-index {}}))
 
@@ -41,6 +44,7 @@
                     (update :pages-index dissoc page-id)
                     (update ::selection dissoc page-id)
                     (update ::snap dissoc page-id)))
+  (t/clear-uuid-cache!)
   (log/dbg :hint "page index dropped" :id page-id ::log/sync? true)
   nil)
 
