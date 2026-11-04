@@ -20,6 +20,7 @@
    [frontend-tests.data.modal-test]
    [frontend-tests.data.nitrate-test]
    [frontend-tests.data.persistence-commits-test]
+   [frontend-tests.data.persistence-lock-test]
    [frontend-tests.data.persistence-retry-test]
    [frontend-tests.data.persistence-rollback-test]
    [frontend-tests.data.persistence-test]
@@ -59,6 +60,7 @@
    [frontend-tests.logic.components-and-tokens]
    [frontend-tests.logic.copy-paste-typography-test]
    [frontend-tests.logic.copying-and-duplicating-test]
+   [frontend-tests.logic.drag-on-save-failure-test]
    [frontend-tests.logic.frame-guides-test]
    [frontend-tests.logic.groups-test]
    [frontend-tests.logic.ignore-tree-test]
@@ -205,6 +207,7 @@
    'frontend-tests.data.modal-test
    'frontend-tests.data.nitrate-test
    'frontend-tests.data.persistence-commits-test
+   'frontend-tests.data.persistence-lock-test
    'frontend-tests.data.persistence-retry-test
    'frontend-tests.data.persistence-rollback-test
    'frontend-tests.data.persistence-test
@@ -250,6 +253,7 @@
    'frontend-tests.logic.components-and-tokens
    'frontend-tests.logic.copy-paste-typography-test
    'frontend-tests.logic.copying-and-duplicating-test
+   'frontend-tests.logic.drag-on-save-failure-test
    'frontend-tests.logic.frame-guides-test
    'frontend-tests.logic.groups-test
    'frontend-tests.logic.ignore-tree-test
