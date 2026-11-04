@@ -1877,7 +1877,22 @@ msgstr[1] ""
 
 #: src/app/main/data/persistence.cljs
 msgid "errors.save-rejected-changes-undone"
-msgstr "Algunos de tus últimos cambios no se han podido guardar y se han deshecho. El resto de tu trabajo está guardado."
+msgstr ""
+"Algunos cambios no se han podido guardar, así que se han deshecho tus "
+"últimos cambios."
+
+#: src/app/main/data/persistence.cljs
+msgid "errors.save-rejected-changes-undone-in-file"
+msgstr ""
+"Algunos cambios en «%s» no se han podido guardar, así que se han deshecho "
+"tus últimos cambios en ese archivo."
+
+#: src/app/main/data/persistence.cljs
+msgid "errors.save-rejected-damaged-data"
+msgstr ""
+"Esta página tiene datos dañados que no se pueden reparar automáticamente, "
+"así que sus cambios no se pueden guardar y se han deshecho. Contacta con "
+"soporte."
 
 #: src/app/main/data/persistence.cljs
 msgid "errors.save-retrying-busy"
@@ -7355,6 +7370,13 @@ msgid "workspace.notifications.file-repaired"
 msgstr ""
 "Hemos corregido algunos problemas de este archivo. Hay una copia de la "
 "versión original en el historial de versiones."
+
+#: src/app/main/data/persistence.cljs
+msgid "workspace.notifications.file-repaired-changes-undone"
+msgstr ""
+"Hemos corregido algunos problemas de este archivo. Hay una copia de la "
+"versión original en el historial de versiones. Algunos cambios no se han "
+"podido guardar, así que se han deshecho tus últimos cambios."
 
 #: src/app/main/ui/workspace/sidebar/options/menus/interactions.cljs:784
 msgid "workspace.options.add-interaction"

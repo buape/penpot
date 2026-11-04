@@ -1834,7 +1834,15 @@ msgstr[1] "You can no longer edit this file, so %s changes could not be saved. R
 
 #: src/app/main/data/persistence.cljs
 msgid "errors.save-rejected-changes-undone"
-msgstr "Some of your latest changes couldn't be saved and were undone. The rest of your work is saved."
+msgstr "Some changes couldn't be saved, so your latest changes were undone."
+
+#: src/app/main/data/persistence.cljs
+msgid "errors.save-rejected-changes-undone-in-file"
+msgstr "Some changes to “%s” couldn't be saved, so your latest changes to that file were undone."
+
+#: src/app/main/data/persistence.cljs
+msgid "errors.save-rejected-damaged-data"
+msgstr "This page has damaged data that can't be repaired automatically, so changes to it can't be saved and were undone. Contact support."
 
 #: src/app/main/data/persistence.cljs:310
 msgid "errors.save-retrying"
@@ -7224,6 +7232,11 @@ msgid "workspace.notifications.file-repaired"
 msgstr ""
 "We fixed some issues in this file. You can find a copy of the original version in "
 "the version history."
+
+#: src/app/main/data/persistence.cljs
+msgid "workspace.notifications.file-repaired-changes-undone"
+msgstr ""
+"We fixed some issues in this file. You can find a copy of the original version in the version history. Some changes couldn't be saved, so your latest changes were undone."
 
 #: src/app/main/ui/workspace/sidebar/options/menus/interactions.cljs:784
 msgid "workspace.options.add-interaction"
