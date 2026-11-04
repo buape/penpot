@@ -10048,6 +10048,10 @@ msgstr "Previsualizando version: %s"
 msgid "workspace.versions.preview.unnamed"
 msgstr "Versión sin nombre"
 
+#: src/app/main/data/workspace/versions.cljs, src/app/main/ui/workspace/sidebar/versions.cljs
+msgid "workspace.versions.repair.version"
+msgstr "Antes de la reparación automática, %s"
+
 #: src/app/main/data/workspace/versions.cljs:239
 msgid "workspace.versions.restore-warning"
 msgstr "¿Quieres restaurar esta versión?"
