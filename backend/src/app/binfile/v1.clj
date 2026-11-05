@@ -332,7 +332,7 @@
   [{:keys [::output ::bfc/ids ::bfc/include-libraries] :as cfg}]
   (if-let [fids (get-files cfg ids)]
     (let [lids (when include-libraries
-                 (bfc/get-libraries cfg ids))
+                 (bfc/get-same-team-libraries cfg ids))
           ids  (into fids lids)]
       (write-obj! output {:version cf/version :files ids})
       (vswap! bfc/*state* assoc :files ids))
@@ -391,7 +391,10 @@
   [{:keys [::output ::bfc/include-libraries] :as cfg}]
   (let [ids  (-> bfc/*state* deref :files set)
         rels (when include-libraries
-               (bfc/get-files-rels cfg ids))]
+               (->> (bfc/get-files-rels cfg ids)
+                    (filter (fn [rel]
+                              (and (contains? ids (:file-id rel))
+                                   (contains? ids (:library-file-id rel)))))))]
     (l/dbg :hint "found rels" :total (count rels) ::l/sync? true)
     (write-obj! output rels)))
 

@@ -24,6 +24,7 @@
    [app.storage.tmp :as tmp]
    [backend-tests.helpers :as th]
    [backend-tests.storage-test :as stt]
+   [clojure.data.json :as json]
    [clojure.java.io :as jio]
    [clojure.test :as t]
    [cuerdas.core :as str]
@@ -31,7 +32,10 @@
    [datoteka.io :as io])
   (:import
    java.io.ByteArrayInputStream
-   java.io.DataInputStream))
+   java.io.DataInputStream
+   java.util.zip.ZipEntry
+   java.util.zip.ZipFile
+   java.util.zip.ZipOutputStream))
 
 (t/use-fixtures :once th/state-init)
 (t/use-fixtures :each th/database-reset)
@@ -92,6 +96,66 @@
               :type :rect})}])
 
     (dissoc file :data)))
+
+(defn- export-file
+  [file & {:keys [include-libraries]}]
+  (let [output (tmp/tempfile :suffix ".zip")]
+    (v3/export-files!
+     (-> th/*system*
+         (assoc ::bfc/ids #{(:id file)})
+         (assoc ::bfc/embed-assets false)
+         (assoc ::bfc/include-libraries (boolean include-libraries)))
+     (io/output-stream output))
+    output))
+
+(defn- import-bundle
+  [profile path]
+  (-> th/*system*
+      (assoc ::bfc/project-id (:default-project-id profile))
+      (assoc ::bfc/profile-id (:id profile))
+      (assoc ::bfc/input path)
+      (v3/import-files!)))
+
+(defn- zip-entry-names
+  [path]
+  (with-open [zip (ZipFile. (.toFile ^java.nio.file.Path path))]
+    (into #{} (map #(.getName ^ZipEntry %)) (enumeration-seq (.entries zip)))))
+
+(defn- read-manifest
+  [path]
+  (with-open [zip (ZipFile. (.toFile ^java.nio.file.Path path))]
+    (let [entry (.getEntry zip "manifest.json")]
+      (with-open [input (.getInputStream zip entry)]
+        (json/read-str (slurp input :encoding "UTF-8"))))))
+
+(defn- tamper-manifest-relations!
+  [src dst relations]
+  (with-open [zin  (ZipFile. (.toFile ^java.nio.file.Path src))
+              zout (ZipOutputStream. (io/output-stream dst))]
+    (doseq [entry (enumeration-seq (.entries zin))]
+      (let [name (.getName ^ZipEntry entry)]
+        (if (= name "manifest.json")
+          (let [manifest (-> (slurp (.getInputStream zin entry) :encoding "UTF-8")
+                             (json/read-str)
+                             (assoc "relations" relations))]
+            (.putNextEntry zout (ZipEntry. name))
+            (.write zout (.getBytes (json/write-str manifest) "UTF-8"))
+            (.closeEntry zout))
+          (do
+            (.putNextEntry zout (ZipEntry. name))
+            (with-open [input (.getInputStream zin entry)]
+              (io/copy input zout))
+            (.closeEntry zout)))))))
+
+(defn- prepare-victim-file
+  [n]
+  (let [profile  (th/create-profile* n)
+        team     (th/create-team* n {:profile-id (:id profile)})
+        project  (th/create-project* n {:team-id (:id team)
+                                        :profile-id (:id profile)})
+        file     (th/create-file* n {:profile-id (:id profile)
+                                     :project-id (:id project)})]
+    [profile file]))
 
 (def ^:private svg-raw-page-id (uuid/custom 1 1))
 (def ^:private svg-raw-root-id (uuid/custom 3 1))
@@ -407,3 +471,105 @@
                   (bfc/configure-import-transaction cfg)
                   (t/is (true? (-> (db/exec-one! conn [sql:current-idle-timeout])
                                    :ok)))))))
+
+;; --- Library relations security tests
+
+(t/deftest import-v3-ignores-relations-outside-package
+  (let [profile     (th/create-profile* 1)
+        file        (prepare-simple-file profile)
+        [_ victim]  (prepare-victim-file 3)
+        bundle      (export-file file)
+        evil        (tmp/tempfile :suffix ".zip")
+        _           (tamper-manifest-relations! bundle evil
+                                                [[(str (:id file)) (str (:id victim))]])
+        [file-id :as result] (import-bundle profile evil)]
+    (t/is (= 1 (count result)))
+    (t/is (empty? (th/db-query :file-library-rel {:file-id file-id})))
+    (t/is (empty? (th/db-query :file-library-sync {:file-id file-id})))))
+
+(t/deftest import-v3-ignores-foreign-file-id
+  (let [profile     (th/create-profile* 1)
+        file        (prepare-simple-file profile)
+        [_ victim]  (prepare-victim-file 3)
+        bundle      (export-file file)
+        evil        (tmp/tempfile :suffix ".zip")
+        _           (tamper-manifest-relations! bundle evil
+                                                [[(str (:id victim)) (str (:id file))]])
+        result      (import-bundle profile evil)]
+    (t/is (= 1 (count result)))
+    (t/is (empty? (th/db-query :file-library-rel {:file-id (:id victim)})))
+    (t/is (empty? (th/db-query :file-library-sync {:file-id (:id victim)})))))
+
+(t/deftest import-v3-ignores-unknown-library
+  (let [profile     (th/create-profile* 1)
+        file        (prepare-simple-file profile)
+        bundle      (export-file file)
+        evil        (tmp/tempfile :suffix ".zip")
+        _           (tamper-manifest-relations! bundle evil
+                                                [[(str (:id file)) (str (uuid/random))]])
+        [file-id :as result] (import-bundle profile evil)]
+    (t/is (= 1 (count result)))
+    (t/is (empty? (th/db-query :file-library-rel {:file-id file-id})))))
+
+(t/deftest import-v3-ignores-self-library-relation
+  (let [profile     (th/create-profile* 1)
+        file        (prepare-simple-file profile)
+        bundle      (export-file file)
+        evil        (tmp/tempfile :suffix ".zip")
+        _           (tamper-manifest-relations! bundle evil
+                                                [[(str (:id file)) (str (:id file))]])
+        [file-id :as result] (import-bundle profile evil)]
+    (t/is (= 1 (count result)))
+    (t/is (empty? (th/db-query :file-library-rel {:file-id file-id})))))
+
+(t/deftest import-v3-keeps-valid-library-relation
+  (let [profile  (th/create-profile* 1)
+        file     (prepare-simple-file profile)
+        library  (th/create-file* 2 {:profile-id (:id profile)
+                                     :project-id (:default-project-id profile)})]
+    (th/link-file-to-library* {:file-id (:id file)
+                               :library-id (:id library)})
+    (let [bundle   (export-file file :include-libraries true)
+          result   (import-bundle profile bundle)
+          new-file (->> result
+                        (map #(bfc/get-file th/*system* %))
+                        (some #(when (= (:name %) (:name file)) %)))]
+      (t/is (= 2 (count result)))
+      (t/is (some? new-file))
+      (t/is (= 1 (count (th/db-query :file-library-rel
+                                     {:file-id (:id new-file)})))))))
+
+(t/deftest get-same-team-libraries-excludes-cross-team
+  (let [profile    (th/create-profile* 1)
+        file       (prepare-simple-file profile)
+        library    (th/create-file* 2 {:profile-id (:id profile)
+                                       :project-id (:default-project-id profile)})
+        [_ victim] (prepare-victim-file 3)
+        _          (th/link-file-to-library* {:file-id (:id file)
+                                              :library-id (:id library)})
+        _          (th/db-insert! :file-library-rel
+                                  {:file-id (:id file)
+                                   :library-file-id (:id victim)})
+        libs       (bfc/get-same-team-libraries th/*system* #{(:id file)})]
+    (t/is (contains? libs (:id library)))
+    (t/is (not (contains? libs (:id victim))))))
+
+(t/deftest export-include-libraries-excludes-cross-team
+  (let [profile    (th/create-profile* 1)
+        file       (prepare-simple-file profile)
+        library    (th/create-file* 2 {:profile-id (:id profile)
+                                       :project-id (:default-project-id profile)})
+        [_ victim] (prepare-victim-file 3)
+        _          (th/link-file-to-library* {:file-id (:id file)
+                                              :library-id (:id library)})
+        _          (th/db-insert! :file-library-rel
+                                  {:file-id (:id file)
+                                   :library-file-id (:id victim)})
+        bundle     (export-file file :include-libraries true)
+        names      (zip-entry-names bundle)
+        manifest   (read-manifest bundle)
+        rels       (set (map vec (get manifest "relations")))]
+    (t/is (some #(str/starts-with? % (str "files/" (:id library))) names))
+    (t/is (not-any? #(str/starts-with? % (str "files/" (:id victim))) names))
+    (t/is (contains? rels [(str (:id file)) (str (:id library))]))
+    (t/is (not-any? (fn [rel] (some #{(str (:id victim))} rel)) rels))))

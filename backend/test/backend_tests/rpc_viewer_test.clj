@@ -205,3 +205,41 @@
         (t/is (= 2 (count share-links)))
         (t/is (some #(= link-a-id (:id %)) share-links))
         (t/is (some #(= link-b-id (:id %)) share-links))))))
+
+(t/deftest view-only-bundle-excludes-cross-team-libraries
+  (let [owner    (th/create-profile* 1)
+        file     (th/create-file* 1 {:profile-id (:id owner)
+                                     :project-id (:default-project-id owner)})
+        library  (th/create-file* 2 {:profile-id (:id owner)
+                                     :project-id (:default-project-id owner)})
+        other    (th/create-profile* 3)
+        team     (th/create-team* 3 {:profile-id (:id other)})
+        project  (th/create-project* 3 {:team-id (:id team)
+                                        :profile-id (:id other)})
+        victim   (th/create-file* 3 {:profile-id (:id other)
+                                     :project-id (:id project)})
+        page-id  (get-in file [:data :pages 0])]
+
+    (th/link-file-to-library* {:file-id (:id file)
+                               :library-id (:id library)})
+    (th/db-insert! :file-library-rel
+                   {:file-id (:id file)
+                    :library-file-id (:id victim)})
+
+    (let [link (th/command! {::th/type :create-share-link
+                             ::rpc/profile-id (:id owner)
+                             :file-id (:id file)
+                             :pages #{page-id}
+                             :who-comment "team"
+                             :who-inspect "all"})
+          link-id (get-in link [:result :id])
+          out     (th/command! {::th/type :get-view-only-bundle
+                                :share-id link-id
+                                :file-id (:id file)
+                                :components-v2 true})]
+      (t/is (nil? (:error link)))
+      (t/is (uuid? link-id))
+      (t/is (nil? (:error out)))
+      (let [ids (set (map :id (get-in out [:result :libraries])))]
+        (t/is (contains? ids (:id library)))
+        (t/is (not (contains? ids (:id victim))))))))

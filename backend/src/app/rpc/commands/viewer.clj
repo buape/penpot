@@ -9,6 +9,7 @@
    [app.binfile.common :as bfc]
    [app.common.exceptions :as ex]
    [app.common.features :as cfeat]
+   [app.common.logging :as l]
    [app.common.schema :as sm]
    [app.config :as cf]
    [app.db :as db]
@@ -86,6 +87,14 @@
                   (update :data select-keys [:id :options :pages :pages-index :components]))
 
         libs    (->> (bfc/get-file-libraries conn file-id)
+                     (filterv (fn [lib]
+                                (if (or (not= :share-link (:type perms))
+                                        (= (:team-id lib) (:id team)))
+                                  true
+                                  (do
+                                    (l/warn :hint "ignoring cross-team library in view-only bundle"
+                                            :library-id (str (:id lib)))
+                                    false))))
                      (mapv (fn [{:keys [id] :as lib}]
                              (merge lib (bfc/get-file cfg id)))))
 

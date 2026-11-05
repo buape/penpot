@@ -489,13 +489,75 @@
    SELECT DISTINCT l.id
      FROM libs AS l")
 
+(def ^:private sql:get-file-teams
+  "SELECT DISTINCT p.team_id
+     FROM file AS f
+     JOIN project AS p ON (p.id = f.project_id)
+    WHERE f.id = ANY(?)")
+
+(def ^:private sql:get-libraries-for-teams
+  "WITH RECURSIVE libs AS (
+     SELECT fl.id
+       FROM file AS fl
+       JOIN project AS p ON (p.id = fl.project_id)
+       JOIN file_library_rel AS flr ON (flr.library_file_id = fl.id)
+      WHERE flr.file_id = ANY(?)
+        AND p.team_id = ANY(?)
+    UNION
+     SELECT fl.id
+       FROM file AS fl
+       JOIN project AS p ON (p.id = fl.project_id)
+       JOIN file_library_rel AS flr ON (flr.library_file_id = fl.id)
+       JOIN libs AS l ON (flr.file_id = l.id)
+      WHERE p.team_id = ANY(?)
+   )
+   SELECT DISTINCT l.id
+     FROM libs AS l")
+
+(defn- get-libraries*
+  [conn ids]
+  (let [ids (db/create-array conn "uuid" ids)]
+    (->> (db/exec! conn [sql:get-libraries ids])
+         (into #{} xf-map-id))))
+
 (defn get-libraries
   "Get all libraries ids related to provided file ids"
   [cfg ids]
   (db/run! cfg (fn [{:keys [::db/conn]}]
-                 (let [ids' (db/create-array conn "uuid" ids)]
-                   (->> (db/exec! conn [sql:get-libraries ids'])
-                        (into #{} xf-map-id))))))
+                 (get-libraries* conn ids))))
+
+(defn get-file-teams
+  "Get the set of teams the provided file ids belong to."
+  [cfg ids]
+  (db/run! cfg (fn [{:keys [::db/conn]}]
+                 (let [ids (db/create-array conn "uuid" ids)]
+                   (->> (db/exec! conn [sql:get-file-teams ids])
+                        (into #{} (map :team-id)))))))
+
+(defn get-libraries-for-teams
+  "Get the libraries related to the provided files that belong to one of
+  the provided teams. Cross-team relations are not traversed."
+  [cfg team-ids ids]
+  (if (empty? team-ids)
+    #{}
+    (db/run! cfg (fn [{:keys [::db/conn]}]
+                   (let [ids      (db/create-array conn "uuid" ids)
+                         team-ids (db/create-array conn "uuid" team-ids)]
+                     (->> (db/exec! conn [sql:get-libraries-for-teams
+                                          ids team-ids team-ids])
+                          (into #{} xf-map-id)))))))
+
+(defn get-same-team-libraries
+  "Get the libraries related to the provided files that belong to the
+  same team. Logs and ignores the libraries outside those teams."
+  [cfg file-ids]
+  (let [team-ids (get-file-teams cfg file-ids)
+        all      (get-libraries cfg file-ids)
+        allowed  (get-libraries-for-teams cfg team-ids file-ids)]
+    (doseq [id (set/difference all allowed)]
+      (l/warn :hint "ignoring library outside the export teams"
+              :library-id (str id)))
+    allowed))
 
 (defn get-file-object-thumbnails
   "Return all file object thumbnails for a given file."
@@ -652,7 +714,7 @@
 
 (defn embed-assets
   [cfg data file-id]
-  (let [library-ids (get-libraries cfg [file-id])]
+  (let [library-ids (get-same-team-libraries cfg [file-id])]
     (reduce (fn [data library-id]
               (if-let [library (get-file cfg library-id :include-deleted? true)]
                 (ctf/absorb-assets data (:data library))
