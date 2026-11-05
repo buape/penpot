@@ -44,6 +44,14 @@
 ;; have no organization (`:organization` is `nil`).
 (def ^:private personal-bucket-id :personal)
 
+(defn- personal-team?
+  "The user's own default team (OSS \"Personal projects\"). The
+  organization-scoped default teams found on enterprise deployments
+  are not affected: only a default team without an organization is
+  the personal one."
+  [{:keys [is-default organization-id]}]
+  (and is-default (not organization-id)))
+
 (defn organization-bucket-id
   [organization]
   (or (:id organization) personal-bucket-id))
@@ -87,9 +95,10 @@
   (\"Personal projects\") always last. `boolean` collapses a missing
   `:is-default` and an explicit `false` into one comparator value."
   [teams]
-  (sort-by (juxt (fn [team] (boolean (:is-default team)))
-                 (fn [team] (name-sort-key (:name team ""))))
-           teams))
+  (->> teams
+       (remove personal-team?)
+       (sort-by (juxt (fn [team] (boolean (:is-default team)))
+                      (fn [team] (name-sort-key (:name team "")))))))
 
 (defn sort-all-teams
   "Orders every team for the simplified single-column dropdown:
@@ -100,9 +109,10 @@
   ([teams]
    (sort-all-teams teams team-display-name))
   ([teams display-name]
-   (sort-by (juxt (fn [team] (boolean (:is-default team)))
-                  (comp name-sort-key display-name))
-            teams)))
+   (->> teams
+        (remove personal-team?)
+        (sort-by (juxt (fn [team] (boolean (:is-default team)))
+                       (comp name-sort-key display-name))))))
 
 (defn teams-for-organization
   "Teams to preview in the dropdown's second column for
@@ -350,8 +360,7 @@
         ;; `sort-organization-teams`/`sort-all-teams`). It stays out of
         ;; the scroll area so it sits right under a short list and
         ;; sticks above the actions under a long one.
-        listed   (remove :is-default teams)
-        personal (d/seek :is-default teams)
+        listed   (remove personal-team? teams)
 
         {:keys [ref on-scroll fade?]} (use-scroll-fade teams)]
 
@@ -370,18 +379,6 @@
                          :selected-team-id selected-team-id
                          :on-select on-select
                          :on-context-menu on-context-menu}])]]
-
-     (when personal
-       [:ul {:class (stl/css :column-bucket)}
-        ;; Skipped when it's the only team: there's nothing above it
-        ;; to set it apart from.
-        (when (seq listed)
-          [:li {:role "separator" :class (stl/css :column-separator)}])
-        [:> team-item* {:team personal
-                        :href (team-href router personal)
-                        :selected-team-id selected-team-id
-                        :on-select on-select
-                        :on-context-menu on-context-menu}]])
 
      [:ul {:class (stl/css :column-actions)}
       [:li {:role "separator" :class (stl/css :column-separator)}]
@@ -440,8 +437,8 @@
         (mf/with-memo [teams current-organization]
           (cond-> (->> teams
                        vals
-                       (filter :is-default)
-                       (map dtm/team->organization)
+                       (remove personal-team?)
+                       (keep dtm/team->organization)
                        (d/index-by organization-bucket-id))
             (:id current-organization)
             (assoc (:id current-organization) current-organization)))

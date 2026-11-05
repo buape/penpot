@@ -1,0 +1,104 @@
+name: BUAPE-frontend
+
+run-name: >-
+  BUAPE-frontend (develop @ ${{ github.sha }})
+
+# Buape fork build pipeline: frontend bundle only. Runs the upstream
+# devenv-contained build (penpotapp/devenv) so the toolchain (JDK, node,
+# wasm toolchain, shadow-cljs) matches the release images, then packages
+# the bundle with Dockerfile.frontend and publishes to GHCR.
+on:
+  push:
+    branches: [develop]
+    paths:
+      - 'frontend/**'
+      - 'common/**'
+      - 'render-wasm/**'
+      - 'plugins/**'
+      - 'mcp/**'
+      - 'docker/images/Dockerfile.frontend'
+      - 'manage.sh'
+      - '.github/workflows/build-buape.yml'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Rebuild even if the image tag already exists'
+        type: boolean
+        required: false
+        default: false
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-frontend:
+    name: Buape frontend image
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
+        with:
+          # manage.sh stamps versions with `git describe --tags`; needs
+          # full history and annotated tags.
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Version info
+        id: vars
+        run: |
+          echo "short_sha=$(git rev-parse --short=7 HEAD)" >> $GITHUB_OUTPUT
+          echo "sha=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Pull upstream devenv image
+        run: docker pull penpotapp/devenv:latest
+
+      - name: Build frontend bundle (devenv container)
+        env:
+          # shadow-cljs release build is memory hungry
+          JAVA_OPTS: "-Xms2G -Xmx10G"
+        run: |
+          ./manage.sh build-frontend-bundle 2>&1 | tee /tmp/bundle.log
+          test -f bundles/frontend/version.txt
+
+      - name: Set up QEMU (multi-arch image build)
+        run: docker run --privileged --rm tonistiigi/binfmt --install all
+
+      - name: Log in to GHCR
+        uses: docker/login-action@74a5d142397b4f367a81961eb4e6a43486834a80 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push frontend image
+        run: |
+          TAG="ghcr.io/${{ github.repository }}/penpot-frontend"
+          docker buildx create --name penpot --driver docker-container --use >/dev/null 2>&1 || true
+          docker buildx build \
+            --platform linux/amd64 \
+            --build-arg BUNDLE_PATH="bundles/frontend/" \
+            -f docker/images/Dockerfile.frontend \
+            --tag "${TAG}:${{ steps.vars.outputs.short_sha }}" \
+            --tag "${TAG}:develop" \
+            --push \
+            .
+        env:
+          SOURCE_DATE_EPOCH: 0
+
+      - name: Summary
+        run: |
+          {
+            echo "### Frontend image pushed"
+            echo ""
+            echo '- `ghcr.io/${{ github.repository }}/penpot-frontend:${{ steps.vars.outputs.short_sha }}`'
+            echo '- `ghcr.io/${{ github.repository }}/penpot-frontend:develop`'
+            echo ""
+            echo "Commit: ${{ steps.vars.outputs.sha }}"
+          } >> "$GITHUB_STEP_SUMMARY"

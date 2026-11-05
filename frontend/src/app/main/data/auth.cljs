@@ -52,7 +52,17 @@
                       team-id         (dtm/get-last-team-id)
                       team-id         (if (and team-id (contains? team-ids team-id))
                                         team-id
-                                        default-team-id)]
+                                        default-team-id)
+                      ;; BUAPE: the personal default team is hidden; fall
+                      ;; back to the first team synced from the IdP.
+                      other-team-id   (->> teams
+                                           (seq)
+                                           (map :id)
+                                           (remove #(= % default-team-id))
+                                           (first))
+                      team-id         (if (and (= team-id default-team-id) other-team-id)
+                                        other-team-id
+                                        team-id)]
                   (->> (dtm/resolve-login-team-id {:team-id team-id
                                                    :default-team-id default-team-id})
                        (rx/mapcat (fn [team-id]

@@ -296,7 +296,13 @@
                                last-team-id    (dtm/get-last-team-id)
                                team-id         (if (contains? teams last-team-id)
                                                  last-team-id
-                                                 default-team-id)]
+                                                 default-team-id)
+                               ;; BUAPE: the personal default team is hidden;
+                               ;; fall back to the first team synced from the IdP.
+                               other-team-id   (first (remove #(= % default-team-id) teams))
+                               team-id         (if (and (= team-id default-team-id) other-team-id)
+                                                 other-team-id
+                                                 team-id)]
                            (->> (dtm/resolve-login-team-id {:team-id team-id
                                                             :default-team-id default-team-id})
                                 (rx/subs!
