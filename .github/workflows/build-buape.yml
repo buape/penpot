@@ -77,18 +77,26 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Stage bundle for image build
+        run: |
+          # Dockerfile.frontend copies the bundle relative to the
+          # docker/images/ context (see the upstream build-docker.yml):
+          # place it at the default $BUNDLE_PATH.
+          mkdir -p docker/images/bundle-frontend
+          cp -R bundles/frontend/. docker/images/bundle-frontend/
+
       - name: Build and push frontend image
         run: |
           TAG="ghcr.io/${{ github.repository }}/penpot-frontend"
           docker buildx create --name penpot --driver docker-container --use >/dev/null 2>&1 || true
           docker buildx build \
             --platform linux/amd64 \
-            --build-arg BUNDLE_PATH="bundles/frontend/" \
+            --build-arg BUNDLE_PATH="./bundle-frontend/" \
             -f docker/images/Dockerfile.frontend \
             --tag "${TAG}:${{ steps.vars.outputs.short_sha }}" \
             --tag "${TAG}:develop" \
             --push \
-            .
+            docker/images/
         env:
           SOURCE_DATE_EPOCH: 0
 
